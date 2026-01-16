@@ -25,57 +25,38 @@ app.get("/", (req, res) => {
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Coachpedia – One Stop Solution</title>
 
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: linear-gradient(135deg, #eef2ff, #f8fafc);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      margin: 0;
-    }
-    .box {
-      background: white;
-      padding: 45px;
-      border-radius: 14px;
-      text-align: center;
-      box-shadow: 0 20px 40px rgba(0,0,0,0.12);
-      max-width: 420px;
-    }
-    h1 {
-      margin-bottom: 10px;
-      color: #1e293b;
-      font-size: 32px;
-    }
-    p {
-      color: #475569;
-      margin-bottom: 28px;
-      font-size: 16px;
-    }
-    a {
-      text-decoration: none;
-      background: #4f46e5;
-      color: white;
-      padding: 14px 26px;
-      border-radius: 8px;
-      font-weight: bold;
-      display: inline-block;
-      transition: 0.2s ease;
-    }
-    a:hover {
-      background: #4338ca;
-      transform: translateY(-2px);
-    }
-  </style>
+  <!-- ✅ EXTERNAL CSS -->
+  <link rel="stylesheet" href="/css/style.css" />
 </head>
 
 <body>
-  <div class="box">
-    <h1>📘 Coachpedia</h1>
-    <p>One Stop Solution for Teachers & Students</p>
-    <a href="/subjects">Open Dashboard</a>
+
+  <!-- NAVBAR -->
+  <div class="navbar">
+    <div class="logo">📘 Coachpedia</div>
+    <div class="nav-links">
+      <a href="/subjects/student/physical">Student</a>
+      <a href="/subjects">Teacher</a>
+      <a href="#">Login</a>
+    </div>
   </div>
+
+  <!-- HERO SECTION -->
+  <div class="hero">
+    <div class="hero-text">
+      <h1>One Stop Solution for Teachers & Students</h1>
+      <p>
+        Plan lectures, manage topics, attach questions and track progress —
+        all in one simple and powerful dashboard.
+      </p>
+      <a href="/subjects">Open Dashboard</a>
+    </div>
+
+    <div class="hero-box">
+      Smart Teaching 📊
+    </div>
+  </div>
+
 </body>
 </html>
   `);
