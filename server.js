@@ -24,36 +24,44 @@ app.get("/", (req, res) => {
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Coachpedia – One Stop Solution</title>
-
-  <!-- ✅ EXTERNAL CSS -->
   <link rel="stylesheet" href="/css/style.css" />
 </head>
 
 <body>
 
-  <!-- NAVBAR -->
-  <div class="navbar">
-    <div class="logo">📘 Coachpedia</div>
-    <div class="nav-links">
-      <a href="/subjects/student/physical">Student</a>
-      <a href="/subjects">Teacher</a>
-      <a href="#">Login</a>
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-row">
+      <div class="left-links">
+        <a href="/subjects/student/physical">Student</a>
+        <a href="/subjects">Teacher</a>
+        <a href="#">Login</a>
+      </div>
+
+      <div class="right-links">
+        <a href="#">Latest Events</a>
+      </div>
+    </div>
+
+    <div class="brand">
+      <h1>COACHPEDIA</h1>
+      <p>One Stop Solution for Teachers & Students</p>
     </div>
   </div>
 
-  <!-- HERO SECTION -->
+  <!-- HERO -->
   <div class="hero">
     <div class="hero-text">
-      <h1>One Stop Solution for Teachers & Students</h1>
+      <h2>Teach Better. Track Smarter.</h2>
       <p>
-        Plan lectures, manage topics, attach questions and track progress —
-        all in one simple and powerful dashboard.
+        Design full-year plans, manage daily topics, attach questions,
+        and monitor progress — all from one clean dashboard.
       </p>
       <a href="/subjects">Open Dashboard</a>
     </div>
 
     <div class="hero-box">
-      Smart Teaching 📊
+      Built for Educators 🎓
     </div>
   </div>
 
