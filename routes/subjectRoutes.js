@@ -1,300 +1,296 @@
 const express = require("express");
 const router = express.Router();
 const fs = require("fs");
+const multer = require("multer");
+const path = require("path");
 
-/* ===== DATA FILES ===== */
-const TOPIC_FILE = "./topics.json";
-const QUESTION_FILE = "./questions.json";
+/* =========================
+   MULTER CONFIG
+   ========================= */
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, path.join(__dirname, "..", "uploads"));
+  },
+  filename: (req, file, cb) => {
+    cb(null, Date.now() + path.extname(file.originalname));
+  }
+});
+const upload = multer({ storage });
 
-/* ===== MEMORY ===== */
-let topics = {};
-let questions = {};
+/* =========================
+   DATA FILES
+   ========================= */
+const DOUBT_FILE = path.join(__dirname, "..", "doubts.json");
+let doubts = fs.existsSync(DOUBT_FILE)
+  ? JSON.parse(fs.readFileSync(DOUBT_FILE))
+  : [];
 
-/* ===== LOAD DATA ===== */
-if (fs.existsSync(TOPIC_FILE)) {
-  topics = JSON.parse(fs.readFileSync(TOPIC_FILE));
+function saveDoubts() {
+  fs.writeFileSync(DOUBT_FILE, JSON.stringify(doubts, null, 2));
 }
-if (fs.existsSync(QUESTION_FILE)) {
-  questions = JSON.parse(fs.readFileSync(QUESTION_FILE));
-}
 
-/* ===== SAVE FUNCTIONS ===== */
-function saveTopics() {
-  fs.writeFileSync(TOPIC_FILE, JSON.stringify(topics, null, 2));
-}
-function saveQuestions() {
-  fs.writeFileSync(QUESTION_FILE, JSON.stringify(questions, null, 2));
-}
+/* =========================
+   SUBJECT STRUCTURE
+   ========================= */
+const SUBJECT_STRUCTURE = {
+  chemistry: {
+    streams: ["physical", "inorganic", "organic"]
+  }
+};
 
-/* ===== DASHBOARD ===== */
+/* ======================================================
+   STUDENT DASHBOARD  (/subjects)
+   ====================================================== */
 router.get("/", (req, res) => {
   res.send(`
-    <h2>CHEMISTRY DASHBOARD</h2>
+    <link rel="stylesheet" href="/css/dashboard.css">
+    <h2>STUDENT DASHBOARD</h2>
 
-    <h3>Teacher View</h3>
-    <a href="/subjects/physical">Physical</a> |
-    <a href="/subjects/organic">Organic</a> |
-    <a href="/subjects/inorganic">Inorganic</a>
+    <div class="container">
+      <div class="card">
+        <h3>Chemistry</h3>
+        <a class="btn btn-primary" href="/subjects/student/chemistry">
+          Open Chemistry
+        </a>
+      </div>
+
+      <div class="card">
+        <h3>Student Tools</h3>
+        <p><a class="btn btn-success" href="/subjects/ask-doubt">Ask Doubt</a></p>
+        <p><a class="btn btn-primary" href="/subjects/student/doubts">My Doubts</a></p>
+      </div>
+
+      <div class="card">
+        <h3>Teacher</h3>
+        <p><a class="btn btn-secondary" href="/subjects/teacher/doubts">Teacher Panel</a></p>
+      </div>
+    </div>
+  `);
+});
+
+/* ======================================================
+   STUDENT → CHEMISTRY
+   ====================================================== */
+router.get("/student/chemistry", (req, res) => {
+  res.send(`
+    <h2>CHEMISTRY (Student)</h2>
+    <ul>
+      <li><a href="/subjects/student/chemistry/physical">Physical Chemistry</a></li>
+      <li><a href="/subjects/student/chemistry/inorganic">Inorganic Chemistry</a></li>
+      <li><a href="/subjects/student/chemistry/organic">Organic Chemistry</a></li>
+    </ul>
 
     <hr>
+    <a href="/subjects/ask-doubt">Ask Doubt</a><br>
+    <a href="/subjects/student/doubts">My Doubts</a><br><br>
 
-    <h3>Student View</h3>
-    <a href="/subjects/student/physical">Physical (Student)</a> |
-    <a href="/subjects/student/organic">Organic (Student)</a> |
-    <a href="/subjects/student/inorganic">Inorganic (Student)</a>
+    <a href="/subjects">⬅ Back</a>
   `);
 });
 
-/* ===== TEACHER TOPIC PAGE ===== */
-function topicPage(res, subject, totalDays) {
-  let html = `<h2>${subject.toUpperCase()} – Daily Topics (Teacher)</h2>`;
+/* ======================================================
+   STUDENT → STREAM VIEW (READ ONLY)
+   ====================================================== */
+router.get("/student/chemistry/:stream", (req, res) => {
+  const stream = req.params.stream;
 
-  for (let day = 1; day <= totalDays; day++) {
-    const key = subject + "_" + day;
-    const dayTopics = topics[key] || [];
-
-    html += `<b>Day ${day}</b><ul>`;
-
-    dayTopics.forEach((t, i) => {
-      if (!t || !t.text) return;
-      html += `
-        <li>
-          ${t.done ? "✅" : "❌"} ${t.text}
-          <a href="/subjects/${subject}/toggle?day=${day}&index=${i}">[Toggle]</a>
-          <a href="/subjects/${subject}/questions?day=${day}&index=${i}">[Questions]</a>
-          <a href="/subjects/${subject}/edit?day=${day}&index=${i}">✏️</a>
-          <a href="/subjects/${subject}/delete?day=${day}&index=${i}">❌</a>
-        </li>
-      `;
-    });
-
-    html += `</ul>
-      <form method="GET" action="/subjects/${subject}/add">
-        <input type="hidden" name="day" value="${day}">
-        <input type="text" name="topic" placeholder="Add topic" required>
-        <button>Add Topic</button>
-      </form>
-      <hr>
-    `;
+  if (!SUBJECT_STRUCTURE.chemistry.streams.includes(stream)) {
+    return res.send("Invalid stream");
   }
 
-  html += `<a href="/subjects">⬅ Back</a>`;
-  res.send(html);
-}
-
-/* ===== SUBJECT ROUTES ===== */
-router.get("/physical", (req, res) => topicPage(res, "physical", 120));
-router.get("/organic", (req, res) => topicPage(res, "organic", 150));
-router.get("/inorganic", (req, res) => topicPage(res, "inorganic", 95));
-
-/* ===== ADD TOPIC ===== */
-router.get("/:subject/add", (req, res) => {
-  const { subject } = req.params;
-  const { day, topic } = req.query;
-  const key = subject + "_" + day;
-
-  if (!topics[key]) topics[key] = [];
-  topics[key].push({ text: topic, done: false });
-  saveTopics();
-
-  res.redirect("/subjects/" + subject);
-});
-
-/* ===== DELETE TOPIC ===== */
-router.get("/:subject/delete", (req, res) => {
-  const { subject } = req.params;
-  const { day, index } = req.query;
-  const key = subject + "_" + day;
-
-  if (topics[key]) topics[key].splice(index, 1);
-  saveTopics();
-
-  res.redirect("/subjects/" + subject);
-});
-
-/* ===== EDIT TOPIC ===== */
-router.get("/:subject/edit", (req, res) => {
-  const { subject } = req.params;
-  const { day, index } = req.query;
-  const key = subject + "_" + day;
-  const old = topics[key][index];
-
   res.send(`
-    <h3>Edit Topic</h3>
-    <form method="GET" action="/subjects/${subject}/update">
-      <input type="hidden" name="day" value="${day}">
-      <input type="hidden" name="index" value="${index}">
-      <input type="text" name="topic" value="${old.text}" required>
-      <button>Update</button>
-    </form>
-    <a href="/subjects/${subject}">Cancel</a>
+    <h2>${stream.toUpperCase()} CHEMISTRY</h2>
+    <p>✔ Daily topics (teacher planned)</p>
+    <p>✔ Homework & questions</p>
+    <p>✔ Related doubts</p>
+
+    <a href="/subjects/student/chemistry">⬅ Back</a>
   `);
 });
 
-/* ===== UPDATE TOPIC ===== */
-router.get("/:subject/update", (req, res) => {
-  const { subject } = req.params;
-  const { day, index, topic } = req.query;
-  const key = subject + "_" + day;
+/* ======================================================
+   ASK DOUBT
+   ====================================================== */
+router.get("/ask-doubt", (req, res) => {
+  res.send(`
+    <h2>ASK DOUBT</h2>
 
-  topics[key][index].text = topic;
-  saveTopics();
+    <form method="POST" action="/subjects/ask-doubt" enctype="multipart/form-data">
+      <textarea name="doubt" required placeholder="Write your doubt"></textarea><br><br>
+      <input type="file" name="image" accept="image/*"><br><br>
+      <button type="submit">Submit Doubt</button>
+    </form>
 
-  res.redirect("/subjects/" + subject);
+    <a href="/subjects">⬅ Back</a>
+  `);
 });
 
-/* ===== TOGGLE DONE ===== */
-router.get("/:subject/toggle", (req, res) => {
-  const { subject } = req.params;
-  const { day, index } = req.query;
-  const key = subject + "_" + day;
+router.post("/ask-doubt", upload.single("image"), (req, res) => {
+  const text = req.body.doubt.trim();
 
-  topics[key][index].done = !topics[key][index].done;
-  saveTopics();
+  if (doubts.find(d => d.text === text && d.status === "pending")) {
+    return res.send(`
+      <h3>❌ Doubt already pending</h3>
+      <a href="/subjects/student/doubts">My Doubts</a>
+    `);
+  }
 
-  res.redirect("/subjects/" + subject);
+  doubts.push({
+    id: Date.now(),
+    text,
+    image: req.file ? `uploads/${req.file.filename}` : "",
+    reply: "",
+    aiHint: "",
+    aiAllowed: true,
+    status: "pending"
+  });
+
+  saveDoubts();
+  res.redirect("/subjects/student/doubts");
 });
 
-/* ===== QUESTIONS PAGE (TEACHER) ===== */
-router.get("/:subject/questions", (req, res) => {
-  const { subject } = req.params;
-  const { day, index } = req.query;
-  const qKey = `${subject}_${day}_${index}`;
+/* ======================================================
+   STUDENT → MY DOUBTS
+   ====================================================== */
+router.get("/student/doubts", (req, res) => {
+  let html = `<h2>MY DOUBTS</h2><ul>`;
 
-  if (!questions[qKey]) questions[qKey] = [];
-
-  let html = `<h3>Questions (Day ${day})</h3><ul>`;
-
-  questions[qKey].forEach((q, i) => {
-    if (!q || !q.text) return;
+  doubts.forEach(d => {
     html += `
       <li>
-        Q${i + 1}. ${q.text} <b>(${q.type})</b>
-        <a href="/subjects/${subject}/questions/edit?day=${day}&index=${index}&qindex=${i}">✏️</a>
-        <a href="/subjects/${subject}/questions/delete?day=${day}&index=${index}&qindex=${i}">❌</a>
-      </li>
+        <b>${d.text}</b><br>
+        ${d.image ? `<img src="/${d.image}" width="200"><br>` : ""}
+        <b>Status:</b> ${d.status}<br>
+
+        ${
+          d.status === "answered"
+            ? `<b>Teacher Reply:</b><br>${d.reply}`
+            : d.aiAllowed
+              ? `<a href="/subjects/student/doubt/${d.id}/ai-hint">🤖 AI Hint</a>`
+              : `<i>AI disabled</i>`
+        }
+
+        <form method="POST"
+              action="/subjects/doubt/${d.id}/delete"
+              onsubmit="return confirm('Delete this doubt?');">
+          <button style="background:red;color:white;">Delete</button>
+        </form>
+      </li><hr>
     `;
   });
 
-  html += `</ul>
-    <form method="GET" action="/subjects/${subject}/questions/add">
-      <input type="hidden" name="day" value="${day}">
-      <input type="hidden" name="index" value="${index}">
-      <input type="text" name="text" placeholder="Question text" required>
-      <select name="type">
-        <option>Homework</option>
-        <option>Class</option>
-        <option>Test</option>
-      </select>
-      <button>Add Question</button>
-    </form>
-    <a href="/subjects/${subject}">⬅ Back</a>
-  `;
-
+  html += `</ul><a href="/subjects">⬅ Back</a>`;
   res.send(html);
 });
 
-/* ===== ADD QUESTION ===== */
-router.get("/:subject/questions/add", (req, res) => {
-  const { subject } = req.params;
-  const { day, index, text, type } = req.query;
-  const qKey = `${subject}_${day}_${index}`;
+/* ======================================================
+   AI HINT
+   ====================================================== */
+router.get("/student/doubt/:id/ai-hint", (req, res) => {
+  const d = doubts.find(x => x.id == req.params.id);
+  if (!d || !d.aiAllowed || d.status === "answered") {
+    return res.send("AI Hint not available");
+  }
 
-  if (!questions[qKey]) questions[qKey] = [];
-  questions[qKey].push({ text, type });
-  saveQuestions();
-
-  res.redirect(`/subjects/${subject}/questions?day=${day}&index=${index}`);
-});
-
-/* ===== DELETE QUESTION ===== */
-router.get("/:subject/questions/delete", (req, res) => {
-  const { subject } = req.params;
-  const { day, index, qindex } = req.query;
-  const qKey = `${subject}_${day}_${index}`;
-
-  questions[qKey].splice(qindex, 1);
-  saveQuestions();
-
-  res.redirect(`/subjects/${subject}/questions?day=${day}&index=${index}`);
-});
-
-/* ===== EDIT QUESTION ===== */
-router.get("/:subject/questions/edit", (req, res) => {
-  const { subject } = req.params;
-  const { day, index, qindex } = req.query;
-  const qKey = `${subject}_${day}_${index}`;
-  const q = questions[qKey][qindex];
+  if (!d.aiHint) {
+    d.aiHint = "Basics revise karo, given data identify karo, phir approach banao.";
+    saveDoubts();
+  }
 
   res.send(`
-    <h3>Edit Question</h3>
-    <form method="GET" action="/subjects/${subject}/questions/update">
-      <input type="hidden" name="day" value="${day}">
-      <input type="hidden" name="index" value="${index}">
-      <input type="hidden" name="qindex" value="${qindex}">
-      <input type="text" name="text" value="${q.text}" required>
-      <select name="type">
-        <option ${q.type === "Homework" ? "selected" : ""}>Homework</option>
-        <option ${q.type === "Class" ? "selected" : ""}>Class</option>
-        <option ${q.type === "Test" ? "selected" : ""}>Test</option>
-      </select>
-      <button>Update</button>
-    </form>
+    <h3>AI Hint</h3>
+    <p>${d.aiHint}</p>
+    <a href="/subjects/student/doubts">⬅ Back</a>
   `);
 });
 
-/* ===== UPDATE QUESTION ===== */
-router.get("/:subject/questions/update", (req, res) => {
-  const { subject } = req.params;
-  const { day, index, qindex, text, type } = req.query;
-  const qKey = `${subject}_${day}_${index}`;
+/* ======================================================
+   TEACHER → DOUBTS
+   ====================================================== */
+router.get("/teacher/doubts", (req, res) => {
+  let html = `<h2>TEACHER – DOUBTS</h2><ul>`;
 
-  questions[qKey][qindex] = { text, type };
-  saveQuestions();
+  doubts.forEach(d => {
+    html += `
+      <li>
+        <b>${d.text}</b><br>
+        Status: ${d.status}<br>
 
-  res.redirect(`/subjects/${subject}/questions?day=${day}&index=${index}`);
+        <a href="/subjects/teacher/doubt/${d.id}">
+          <button>Open</button>
+        </a>
+
+        <form method="POST"
+              action="/subjects/doubt/${d.id}/delete"
+              style="display:inline;"
+              onsubmit="return confirm('Delete permanently?');">
+          <button style="background:red;color:white;">Delete</button>
+        </form>
+      </li><hr>
+    `;
+  });
+
+  html += `</ul><a href="/subjects">⬅ Back</a>`;
+  res.send(html);
 });
 
-/* ===== STUDENT VIEW ===== */
-router.get("/student/:subject", (req, res) => {
-  const { subject } = req.params;
-  const totalDays =
-    subject === "physical" ? 120 :
-    subject === "organic" ? 150 : 95;
+/* ======================================================
+   TEACHER → REPLY
+   ====================================================== */
+router.get("/teacher/doubt/:id", (req, res) => {
+  const d = doubts.find(x => x.id == req.params.id);
+  if (!d) return res.send("Not found");
 
-  let html = `<h2>STUDENT VIEW – ${subject.toUpperCase()}</h2>`;
+  res.send(`
+    <h2>Answer Doubt</h2>
+    <p>${d.text}</p>
+    ${d.image ? `<img src="/${d.image}" width="300"><br>` : ""}
 
-  for (let day = 1; day <= totalDays; day++) {
-    const key = subject + "_" + day;
-    const dayTopics = topics[key];
-    if (!Array.isArray(dayTopics)) continue;
+    <form method="POST" action="/subjects/teacher/doubt/${d.id}">
+      <textarea name="reply" required></textarea><br><br>
+      <button type="submit">Submit Answer</button>
+    </form>
 
-    let hasData = false;
-    let block = `<b>Day ${day}</b><ul>`;
+    <form method="POST" action="/subjects/teacher/doubt/${d.id}/toggle-ai">
+      <button type="submit">
+        ${d.aiAllowed ? "Disable AI" : "Enable AI"}
+      </button>
+    </form>
 
-    dayTopics.forEach((t, i) => {
-      if (!t || !t.text) return;
-      hasData = true;
-      block += `<li>${t.done ? "✅" : "❌"} ${t.text}</li>`;
+    <a href="/subjects/teacher/doubts">⬅ Back</a>
+  `);
+});
 
-      const qKey = `${subject}_${day}_${i}`;
-      if (Array.isArray(questions[qKey])) {
-        block += "<ul>";
-        questions[qKey].forEach(q => {
-          if (q && q.text) {
-            block += `<li>• ${q.text} (${q.type})</li>`;
-          }
-        });
-        block += "</ul>";
-      }
-    });
+router.post("/teacher/doubt/:id", (req, res) => {
+  const d = doubts.find(x => x.id == req.params.id);
+  if (!d) return res.send("Not found");
 
-    block += "</ul><hr>";
-    if (hasData) html += block;
-  }
+  d.reply = req.body.reply;
+  d.status = "answered";
+  saveDoubts();
+  res.redirect("/subjects/teacher/doubts");
+});
 
-  html += `<a href="/subjects">⬅ Dashboard</a>`;
-  res.send(html);
+router.post("/teacher/doubt/:id/toggle-ai", (req, res) => {
+  const d = doubts.find(x => x.id == req.params.id);
+  if (!d) return res.send("Not found");
+
+  d.aiAllowed = !d.aiAllowed;
+  saveDoubts();
+  res.redirect(`/subjects/teacher/doubt/${d.id}`);
+});
+
+/* ======================================================
+   DELETE DOUBT (COMMON)
+   ====================================================== */
+router.post("/doubt/:id/delete", (req, res) => {
+  const id = Number(req.params.id);
+  const index = doubts.findIndex(d => d.id === id);
+  if (index === -1) return res.send("Not found");
+
+  doubts.splice(index, 1);
+  saveDoubts();
+  res.redirect("back");
 });
 
 module.exports = router;
